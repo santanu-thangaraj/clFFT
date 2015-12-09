@@ -363,7 +363,7 @@ static void get_cycles(size_t *cycle_map, int num_reduced_row, int num_reduced_c
     delete[] is_swapped;
 }
 
-#define GLOBAL_MEM_FACTOR 2 //The amount of gloabl memory allocated for mtarix is(GLOBAL_MEM_FACTOR * Largest_dimension * size_of_elements)
+#define GLOBAL_MEM_FACTOR 1 //The amount of global memory allocated for matrix is(GLOBAL_MEM_FACTOR * Largest_dimension * size_of_elements)
 static clfftStatus genSwapKernel(const FFTGeneratedTransposeNonSquareAction::Signature & params, std::string& strKernel, const size_t& lwSize, const size_t reShapeFactor)
 {
     strKernel.reserve(4096);
@@ -452,7 +452,7 @@ static clfftStatus genSwapKernel(const FFTGeneratedTransposeNonSquareAction::Sig
     size_t max_capacity = (avail_mem >> 1) / smaller_dim;
     bool   use_global_memory = 0;
     tmpBuffType = "__local";
-    if (max_capacity <= 1)
+    if (max_capacity < 1)
     {
         /*In-place transpose cannot be performed within specified memory constraints in LDS.*/
         max_capacity = GLOBAL_MEM_FACTOR;
@@ -460,7 +460,7 @@ static clfftStatus genSwapKernel(const FFTGeneratedTransposeNonSquareAction::Sig
         use_global_memory = 1;
         tmpBuffType = "global";
         /*Todo: add the appropriate logic for passing the required global memory*/
-        //size_t global_mem_requirement_in_bytes = GLOBAL_MEM_FACTOR * (smaller_dim * 2) * input_elm_size_in_bytes;
+        size_t global_mem_requirement_in_bytes = avail_mem * input_elm_size_in_bytes;
 
     }
     
@@ -491,6 +491,7 @@ static clfftStatus genSwapKernel(const FFTGeneratedTransposeNonSquareAction::Sig
         // more threads process each row.
         size_t num_threads_processing_row = (256 / local_work_size_swap) * 16;
         local_work_size_swap = num_lines_loaded * num_threads_processing_row;
+        local_work_size_swap = (local_work_size_swap > 256) ? 256 : local_work_size_swap;
 
         clKernWrite(transKernel, 0) << std::endl;
 
@@ -499,6 +500,7 @@ static clfftStatus genSwapKernel(const FFTGeneratedTransposeNonSquareAction::Sig
 
         get_cycles(cycle_map, num_reduced_row, num_reduced_col);
 
+        size_t *cycle_stat = new size_t[cycle_map[0] * 2], stat_idx = 0;
         clKernWrite(transKernel, 0) << std::endl;
 
         clKernWrite(transKernel, 0) << "__constant int swap_table[][3] = {" << std::endl;
@@ -508,18 +510,31 @@ static clfftStatus genSwapKernel(const FFTGeneratedTransposeNonSquareAction::Sig
         {
             start_inx = cycle_map[++inx];
             clKernWrite(transKernel, 0) << "{  " << start_inx << ",  " << cycle_map[inx + 1] << ",  0}," << std::endl;
+            cycle_stat[stat_idx++] = num_swaps;
             num_swaps++;
 
             while (start_inx != cycle_map[++inx])
             {
                 int action_var = (cycle_map[inx + 1] == start_inx) ? 2 : 1;
                 clKernWrite(transKernel, 0) << "{  " << cycle_map[inx] << ",  " << cycle_map[inx + 1] << ",  " << action_var << "}," << std::endl;
+                if(action_var == 2)
+                    cycle_stat[stat_idx++] = num_swaps;
                 num_swaps++;
             }
         }
+        clKernWrite(transKernel, 0) << "};" << std::endl;
+
+        clKernWrite(transKernel, 0) << "__constant int cycle_stat["<< cycle_map[0] <<"][2] = {" << std::endl;
+        for (int i = 0; i < cycle_map[0]; i++)
+        {
+            clKernWrite(transKernel, 0) << "{  " << cycle_stat[i * 2] << ",  " << cycle_stat[i * 2 + 1] << "}," << std::endl;
+        }
+        clKernWrite(transKernel, 0) << "};" << std::endl;
 
         delete[] cycle_map;
-        clKernWrite(transKernel, 0) << "};" << std::endl;
+        delete[] cycle_stat;
+
+        
 
         clKernWrite(transKernel, 0) << std::endl;
 
@@ -621,6 +636,10 @@ static clfftStatus genSwapKernel(const FFTGeneratedTransposeNonSquareAction::Sig
 
             if (!use_global_memory) {
                 clKernWrite(transKernel, 3) << "__local " << dtInput << " tmp_tot_mem[" << avail_mem << "];" << std::endl;
+            }
+            else
+            {
+                clKernWrite(transKernel, 3) << "tmp_tot_mem += " << avail_mem << " * g_index;" << std::endl; 
             }
             clKernWrite(transKernel, 3) << tmpBuffType <<" " << dtInput << " *te = tmp_tot_mem;" << std::endl;
             clKernWrite(transKernel, 3) << tmpBuffType <<" " << dtInput << " *to = (tmp_tot_mem + " << (avail_mem >> 1) << ");" << std::endl;
@@ -1600,6 +1619,7 @@ clfftStatus FFTGeneratedTransposeNonSquareAction::getWorkSizes(std::vector< size
         // more threads process each row.
         size_t num_threads_processing_row = (256 / local_work_size_swap) * 16;
         local_work_size_swap = num_lines_loaded * num_threads_processing_row;
+        local_work_size_swap = (local_work_size_swap > 256) ? 256 : local_work_size_swap;
 
         global_item_size = local_work_size_swap * this->plan->batchsize;
 
