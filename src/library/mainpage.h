@@ -134,9 +134,9 @@ of the same type of transforms to avoid going through the expensive compile step
 binaries are loaded and executed. The CLFFT_CACHE_PATH must point to a folder location where the
 library can store binaries. The other environment variable is CLFFT_REQUEST_LIB_NOMEMALLOC. This
 variable when defined asks the library to do all computations in-place and avoid allocating extra
-device memory whenever possible. This feature is experimental and currently works only for certain types
-of transforms, and where the input can be decomposed into square matrices by the library. Currently it
-works for 1D complex transforms of size of even powers of 2,3,5 and 7.
+device memory whenever possible. This feature currently works only for certain types
+of transforms, where the input can be decomposed into square matrices or a rectangular matrix of ratio 1:2 by the library. Currently it
+works for 1D complex transforms of size of powers of 2 or even powers of 3, 5 and 7.
 
 
 @section clFFTPlans clFFT plans

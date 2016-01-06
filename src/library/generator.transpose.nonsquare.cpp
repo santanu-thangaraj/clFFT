@@ -339,10 +339,10 @@ static clfftStatus genSwapKernel(const FFTGeneratedTransposeNonSquareAction::Sig
 
     // This detects whether the input matrix is rectangle of ratio 1:2
 
-    if ((params.fft_N[0] != 2 * params.fft_N[1]) && (params.fft_N[1] != 2 * params.fft_N[0]))
+    /*if ((params.fft_N[0] != 2 * params.fft_N[1]) && (params.fft_N[1] != 2 * params.fft_N[0]))
     {
         return CLFFT_TRANSPOSED_NOTIMPLEMENTED;
-    }
+    }*/
 
     if (params.fft_placeness == CLFFT_OUTOFPLACE)
     {
@@ -350,6 +350,7 @@ static clfftStatus genSwapKernel(const FFTGeneratedTransposeNonSquareAction::Sig
     }
 
     size_t smaller_dim = (params.fft_N[0] < params.fft_N[1]) ? params.fft_N[0] : params.fft_N[1];
+    size_t bigger_dim = (params.fft_N[1] < params.fft_N[0]) ? params.fft_N[0] : params.fft_N[1];
 
     size_t input_elm_size_in_bytes;
     switch (params.fft_precision)
@@ -425,11 +426,11 @@ static clfftStatus genSwapKernel(const FFTGeneratedTransposeNonSquareAction::Sig
         if (params.fft_N[1] == smaller_dim)
         {
             num_reduced_row = smaller_dim;
-            num_reduced_col = 2;
+            num_reduced_col = bigger_dim / smaller_dim;
         }
         else
         {
-            num_reduced_row = 2;
+            num_reduced_row = bigger_dim / smaller_dim;
             num_reduced_col = smaller_dim;
         }
 
@@ -754,17 +755,19 @@ static clfftStatus genTransposeKernel(const FFTGeneratedTransposeNonSquareAction
 
     // This detects whether the input matrix is rectangle of ratio 1:2
     
-    if ((params.fft_N[0] != 2 * params.fft_N[1]) && (params.fft_N[1] != 2 * params.fft_N[0]))
+   /* if ((params.fft_N[0] != 2 * params.fft_N[1]) && (params.fft_N[1] != 2 * params.fft_N[0]))
     {
         return CLFFT_TRANSPOSED_NOTIMPLEMENTED;
-    }
+    }*/
 
-    if (params.fft_placeness == CLFFT_OUTOFPLACE)
+    //TO-DO: ENABLE THIS CHECK
+    /*if (params.fft_placeness == CLFFT_OUTOFPLACE)
     {
         return CLFFT_TRANSPOSED_NOTIMPLEMENTED;
-    }
+    }*/
 
     size_t smaller_dim = (params.fft_N[0] < params.fft_N[1]) ? params.fft_N[0] : params.fft_N[1];
+    size_t bigger_dim = (params.fft_N[1] < params.fft_N[0]) ? params.fft_N[0] : params.fft_N[1];
 
     // This detects whether the input matrix is a multiple of 16*reshapefactor or not
 
@@ -797,7 +800,7 @@ static clfftStatus genTransposeKernel(const FFTGeneratedTransposeNonSquareAction
         else
             clKernWrite(transKernel, 3) << "const int numGroups_square_matrix_Y_1 = " << (smaller_dim / (16 * reShapeFactor) + 1)*(smaller_dim / (16 * reShapeFactor) + 1 + 1) / 2 << ";" << std::endl;
 
-        clKernWrite(transKernel, 3) << "const int numGroupsY_1 =  numGroups_square_matrix_Y_1 * 2 ;" << std::endl;
+        clKernWrite(transKernel, 3) << "const int numGroupsY_1 =  numGroups_square_matrix_Y_1 * "<< bigger_dim / smaller_dim <<" ;" << std::endl;
 
         for (int i = 2; i < params.fft_DataDim - 1; i++)
         {
@@ -1469,6 +1472,7 @@ clfftStatus FFTGeneratedTransposeNonSquareAction::getWorkSizes(std::vector< size
 
     size_t wg_slice;
     size_t smaller_dim = (this->signature.fft_N[0] < this->signature.fft_N[1]) ? this->signature.fft_N[0] : this->signature.fft_N[1];
+    size_t bigger_dim = (this->signature.fft_N[1] < this->signature.fft_N[0]) ? this->signature.fft_N[0] : this->signature.fft_N[1];
     size_t global_item_size;
 
     if (this->signature.nonSquareKernelType == NON_SQUARE_TRANS_TRANSPOSE)
@@ -1487,7 +1491,7 @@ clfftStatus FFTGeneratedTransposeNonSquareAction::getWorkSizes(std::vector< size
 
         /*Push the data required for the transpose kernels*/
         globalWS.clear();
-        globalWS.push_back(global_item_size * 2);
+        globalWS.push_back(global_item_size * (bigger_dim / smaller_dim));
 
         localWS.clear();
         localWS.push_back(lwSize);
