@@ -344,10 +344,11 @@ static clfftStatus genSwapKernel(const FFTGeneratedTransposeNonSquareAction::Sig
         return CLFFT_TRANSPOSED_NOTIMPLEMENTED;
     }*/
 
-    if (params.fft_placeness == CLFFT_OUTOFPLACE)
+    //TO-DO reenable this
+   /* if (params.fft_placeness == CLFFT_OUTOFPLACE)
     {
         return CLFFT_TRANSPOSED_NOTIMPLEMENTED;
-    }
+    }*/
 
     size_t smaller_dim = (params.fft_N[0] < params.fft_N[1]) ? params.fft_N[0] : params.fft_N[1];
     size_t bigger_dim = (params.fft_N[1] < params.fft_N[0]) ? params.fft_N[0] : params.fft_N[1];
@@ -454,6 +455,8 @@ static clfftStatus genSwapKernel(const FFTGeneratedTransposeNonSquareAction::Sig
             start_inx = cycle_map[++inx];
             clKernWrite(transKernel, 0) << "{  " << start_inx << ",  " << cycle_map[inx + 1] << ",  0}," << std::endl;
             cycle_stat[stat_idx++] = num_swaps;
+            if (start_inx == cycle_map[inx + 1])
+                cycle_stat[stat_idx++] = num_swaps;
             num_swaps++;
 
             while (start_inx != cycle_map[++inx])
@@ -1548,11 +1551,11 @@ clfftStatus FFTGeneratedTransposeNonSquareAction::getWorkSizes(std::vector< size
         if (this->signature.fft_N[1] == smaller_dim)
         {
             num_reduced_row = smaller_dim;
-            num_reduced_col = 2;
+            num_reduced_col = bigger_dim / smaller_dim;
         }
         else
         {
-            num_reduced_row = 2;
+            num_reduced_row = bigger_dim / smaller_dim;
             num_reduced_col = smaller_dim;
         }
 
