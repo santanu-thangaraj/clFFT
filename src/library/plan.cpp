@@ -642,6 +642,15 @@ clfftStatus	clfftBakePlan( clfftPlanHandle plHandle, cl_uint numQueues, cl_comma
 						transGen = Transpose_NONSQUARE;
 					}
 
+                    if (clfftGetRequestLibNoMemAlloc() &&
+                        ((biggerDim == 3 * smallerDim) || (biggerDim == 7 * smallerDim)) &&
+                        fftPlan->placeness == CLFFT_INPLACE)
+                    {
+                        padding = 0;
+                        fftPlan->allOpsInplace = true;
+                        transGen = Transpose_NONSQUARE;
+                    }
+
 					if( clfftGetRequestLibNoMemAlloc() &&
 						(clLengths[0] == clLengths[1]) &&
 						fftPlan->placeness == CLFFT_INPLACE )
@@ -1941,8 +1950,40 @@ clfftStatus	clfftBakePlan( clfftPlanHandle plHandle, cl_uint numQueues, cl_comma
 			if (fftPlan->transflag) //Transpose for 2D
 			{
                 clfftStatus err = CLFFT_SUCCESS;
-				if(fftPlan->gen == Transpose_GCN)
-					fftPlan->action = new FFTGeneratedTransposeGCNAction(plHandle, fftPlan, *commQueueFFT, err);
+                if (fftPlan->gen == Transpose_GCN)
+                {
+/*                    static int test_performed = 0;
+                    size_t backup_0 = fftPlan->length[0];
+                    size_t backup_1 = fftPlan->length[1];
+
+                    clfftLayout  inputLayout_bckup = fftPlan->inputLayout;
+                    clfftLayout  outputLayout_bckup = fftPlan->outputLayout;
+                    clfftPrecision precision_bckup = fftPlan->precision;
+
+                    if (!test_performed)
+                    {
+                        //CLFFT_COMPLEX_PLANAR
+                        //CLFFT_COMPLEX_INTERLEAVED
+                        fftPlan->inputLayout = CLFFT_COMPLEX_INTERLEAVED;
+                        fftPlan->outputLayout = CLFFT_COMPLEX_INTERLEAVED;
+                        if (fftPlan->inputLayout == CLFFT_REAL)
+                            test_performed = 1;
+                        fftPlan->nonSquareKernelType = NON_SQUARE_TRANS_SWAP;// NON_SQUARE_TRANS_TRANSPOSE;// NON_SQUARE_TRANS_SWAP;
+                        fftPlan->precision = CLFFT_SINGLE;
+                        fftPlan->length[0] = 49;// fftPlan->length[1];
+                        fftPlan->length[1] = fftPlan->length[0] * 7;
+                        fftPlan->action = new FFTGeneratedTransposeNonSquareAction(plHandle, fftPlan, *commQueueFFT, err);
+                        OPENCL_V(err, "FFTGeneratedTransposeNonSquareAction() failed");
+
+                    }
+
+                    fftPlan->precision = precision_bckup;
+                    fftPlan->inputLayout = inputLayout_bckup;
+                    fftPlan->outputLayout = outputLayout_bckup;
+                    fftPlan->length[0] = backup_0;
+                    fftPlan->length[1] = backup_1;*/
+                    fftPlan->action = new FFTGeneratedTransposeGCNAction(plHandle, fftPlan, *commQueueFFT, err);
+                }
 				else if (fftPlan->gen == Transpose_SQUARE)
 					fftPlan->action = new FFTGeneratedTransposeSquareAction(plHandle, fftPlan, *commQueueFFT, err);
                 else if (fftPlan->gen == Transpose_NONSQUARE)
