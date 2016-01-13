@@ -633,17 +633,8 @@ clfftStatus	clfftBakePlan( clfftPlanHandle plHandle, cl_uint numQueues, cl_comma
 
 					clfftGenerators transGen = Transpose_GCN;
 
-					if (clfftGetRequestLibNoMemAlloc() &&
-						(clLengths[0] == 2*clLengths[1]) &&
-						fftPlan->placeness == CLFFT_INPLACE)
-					{
-						padding = 0;
-						fftPlan->allOpsInplace = true;
-						transGen = Transpose_NONSQUARE;
-					}
-
                     if (clfftGetRequestLibNoMemAlloc() &&
-                        ((biggerDim == 3 * smallerDim) || (biggerDim == 7 * smallerDim)) &&
+                        ((biggerDim % smallerDim == 0) && (clLengths[0] != clLengths[1])) &&
                         fftPlan->placeness == CLFFT_INPLACE)
                     {
                         padding = 0;
